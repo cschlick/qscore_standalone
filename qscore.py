@@ -281,7 +281,7 @@ if __name__ == '__main__':
     i = int(len(rs)/2)+1
     r = rs[i]
     points = probes_xyz[i]
-    points_to_bild(points,"q_probes_radius"+str(r)+".bild")
+    points_to_bild(points,"q_probes.bild")
 
     # plot
     if len(args.plots_file)>0:
