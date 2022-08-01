@@ -5,6 +5,12 @@ An implementation of the croe-EM validation metric Q-score using cctbx/numpy/sci
 ```bash
 python qscore.py --map=map.mrc --model=model.pdb
 ```
+# Specify number of radial shells and probes-per-shell
+```bash
+python qscore.py --map=map.mrc --model=model.pdb --n_radial_shells=16 --n_probes_per_shell=8
+```
+
+
 # Only calculate for a selection
 ```bash
 python qscore.py --map=map.mrc --model=model.pdb --selection="resname ALA"
