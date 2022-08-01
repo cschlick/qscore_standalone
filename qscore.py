@@ -277,6 +277,12 @@ if __name__ == '__main__':
                     "alt_id":self.parent().altloc.strip()}))
             print("Atom:"+str(i)+","+", ".join([key+":"+str(value) for key,value in atom.identifier_dict.items()])+", Q:"+str(round(q[i],4)))
     
+    # write bild (for now, the middle radial shell)
+    i = int(len(rs)/2)+1
+    r = rs[i]
+    points = probes_xyz[i]
+    points_to_bild(points,"q_probes_radius"+str(r)+".bild")
+
     # plot
     if len(args.plots_file)>0:
         
