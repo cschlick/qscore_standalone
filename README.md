@@ -1,5 +1,5 @@
 # Q-score
-An implementation of the croe-EM validation metric Q-score using cctbx/numpy/scipy
+An implementation of the cryo-EM validation metric Q-score using cctbx/numpy/scipy
 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7446556/
 
 # Simple usage
