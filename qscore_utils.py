@@ -35,21 +35,9 @@ def fisher(r):
 def points_for_density(radii, density,min_value=1):
     return max(min_value,np.round(density * 4 * np.pi * radii**2).astype(int))
 
-def stack_fill(arrs, dim=1, max_to_shape=None, fill=-1.0):
-    max_shape = list(max(arr.shape for arr in arrs))
-    if max_to_shape is not None:
-        max_shape[np.argmax(max_shape)] = max_to_shape
-    
-    ret_arr = np.full((len(arrs),) + tuple(max_shape), fill)
-    
-    for i, arr in enumerate(arrs):
-        # Slice of indices to target the correct dimensions
-        indices = [slice(None)] * arr.ndim
-        indices[dim] = slice(arr.shape[dim])
-        if len(arr)>0:
-            ret_arr[i][tuple(indices)] = arr
-    
-    return ret_arr
+
+
+
 
 def standardize_selection_np(selection,model=None,n_atoms=None):
     # can get bool,int,or string. If int or string must pass model
@@ -140,3 +128,4 @@ def rowwise_corrcoef(A, B, mask=None):
     # Return correlation coefficients
     cc =  sumprod / (sqrt_sos_A * sqrt_sos_B)
     return cc.data
+

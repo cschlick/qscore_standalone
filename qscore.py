@@ -3,20 +3,56 @@ from scipy.spatial import KDTree
 from multiprocessing import Pool,cpu_count
 from qscore_utils import (
           sphere_points,
-          stack_fill,
           trilinear_interpolation,
           rowwise_corrcoef,
           )
 
+from tqdm.notebook import tqdm
+
+# def stack_fill(arrs, dim=1, max_to_shape=None, fill=-1.0):
+#     max_shape = list(max(arr.shape for arr in arrs))
+#     if max_to_shape is not None:
+#         max_shape[np.argmax(max_shape)] = max_to_shape
+    
+#     ret_arr = np.full((len(arrs),) + tuple(max_shape), fill)
+    
+#     for i, arr in enumerate(arrs):
+#         # Slice of indices to target the correct dimensions
+#         indices = [slice(None)] * arr.ndim
+#         indices[dim] = slice(arr.shape[dim])
+#         if len(arr)>0:
+#             ret_arr[i][tuple(indices)] = arr
+    
+#     return ret_arr
+
+def stack_fill(arrs, max_to_shape,fill=-1.0):
+    # Determine the shape of the output array based on max_to_shape and the first array in arrs
+    result_shape = [len(arrs), max_to_shape] + list(arrs[0].shape[1:])
+    result = np.full(result_shape, fill)
+
+    for idx, arr in enumerate(arrs):
+        # Decide the slice length based on max_to_shape and the current array shape
+        slice_len = min(arr.shape[0], max_to_shape)
+
+        # Create an index tuple to handle slicing in multiple dimensions
+        index_tuple = (idx, slice(0, slice_len)) + (Ellipsis,)
+        result[index_tuple] = arr[:slice_len]
+
+    return result
+
 def radial_shell_worker(args):
-    i,atoms_xyz,n_probes,radius_shell,rtol = args
-    numPts = n_probes
+    i,atoms_xyz,n_probes,n_probes_target,radius_shell,rtol = args
+    if radius_shell == 0:
+        radius_shell = 1e-9 # zero causes crash
+    numPts = n_probes_target
     RAD = radius_shell
     outRAD = rtol
     kdtree_atoms = KDTree(atoms_xyz)
     all_pts = [] # list of probe arrays for each atom
-    for atom_i,_ in enumerate(range(atoms_xyz.shape[0])):
+    probe_xyz_r = np.full((n_atoms,n_probes_target,3),-1.0)
+    for atom_i,_ in enumerate(range(7)):
         coord = atoms_xyz[atom_i,:]
+        print("coord:",coord)
         pts = []
         
         # try to get at least [numPts] points at [RAD] distance
@@ -25,14 +61,17 @@ def radial_shell_worker(args):
             # if we find the necessary number of probes in the first iteration, then i will never go to 1
             # points on a sphere at radius RAD...
             n_pts_to_grab = numPts+i*2 # progressively more points are grabbed  with each failed iter
-            #print("n_to_grab:",n_pts_to_grab)
+            print("n_to_grab:",n_pts_to_grab)
             outPts = sphere_points(coord[None,:],RAD,n_pts_to_grab) # get the points
             outPts = outPts.reshape(-1, 3)
             at_pts, at_pts_i = [None]*len(outPts), 0
-            for pt_i,pt in enumerate(outPts) : # identify which ones to keep, progressively grow pts list
+            print("probe candidates")
                 
+            for pt_i,pt in enumerate(outPts) : # identify which ones to keep, progressively grow pts list
+                print(f"\t{pt[0]},{pt[1]},{pt[2]}")
                 # query kdtree to find probe-atom interactions
                 counts = kdtree_atoms.query_ball_point(pt[None,:],RAD*outRAD,return_length=True)
+                
                 # each value in counts is the number of atoms within radius+tol of each probe
                 count = counts.flatten()[0]
                 ptsNear = count
@@ -49,21 +88,26 @@ def radial_shell_worker(args):
         #assert len(pts)>0, "Zero probes were found "
         pts = np.array(pts) # should be shape (n_probes,3)
         all_pts.append(pts)
+        
     # prepare output
-    probe_xyz_r = stack_fill(all_pts,dim=0)
+    n_atoms = len(atoms_xyz)
+    
+    for i,r in enumerate(all_pts):
+        probe_xyz_r[i,:n_probes,:] = r[:n_probes_target,:]
+
     keep_sel = probe_xyz_r != -1.
     keep_sel = np.mean(keep_sel, axis=-1, keepdims=True)  
     keep_sel = np.squeeze(keep_sel, axis=-1)
 
-    return probe_xyz_r, keep_sel.astype(bool)
+    return probe_xyz_r, keep_sel.astype(bool), all_pts
 
 
-def radial_shell_mp(atoms_xyz,n_probes=64,radii=None,rtol=0.9,num_processes=cpu_count()):
+def radial_shell_mp(atoms_xyz,n_probes=64,n_probes_target=8,radii=None,rtol=0.9,num_processes=cpu_count()):
 
 
 
     # Create argument tuples for each chunk
-    args = [(i,atoms_xyz,n_probes,radius_shell,rtol) for i,radius_shell in enumerate(radii)]
+    args = [(i,atoms_xyz,n_probes,n_probes_target,radius_shell,rtol) for i,radius_shell in enumerate(radii)]
 
     # Create a pool of worker processes
     if num_processes >1:
@@ -75,13 +119,26 @@ def radial_shell_mp(atoms_xyz,n_probes=64,radii=None,rtol=0.9,num_processes=cpu_
       for arg in args:
         result = radial_shell_worker(arg)
         results.append(result)
-      
+    
     probe_xyz_all = [result[0] for result in results]
     keep_mask_all = [result[1] for result in results]
-  
-    probe_xyz = stack_fill(probe_xyz_all)
-    keep_mask = stack_fill(keep_mask_all,fill=False)   
-    return probe_xyz,keep_mask
+    all_pts_all = [result[2] for result in results]
+    return all_pts_all # debug
+    n_shells = len(radii)
+    n_atoms = atoms_xyz.shape[0]
+    out_shape = (n_shells,n_atoms,n_probes,3 )
+    out_size = np.prod(out_shape)
+    shell_size = np.prod(out_shape[1:])
+    out_probes = np.full((n_shells,n_atoms,n_probes_target,3),-1.0)
+    for i,p in enumerate(probe_xyz_all):
+        out_probes[i,:,:p.shape[1],:] =p
+
+    out_mask = np.full((n_shells,n_atoms,n_probes_target),False)
+    for i,k in enumerate(out_mask):
+        start = i*shell_size
+        stop = start+shell_size
+        out_mask[i] = k[:,:p.shape[1]]
+    return out_probes,out_mask
 
 
 

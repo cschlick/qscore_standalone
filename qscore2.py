@@ -31,7 +31,11 @@ def radial_shell_worker(args):
 def radial_shell_mp(atoms_xyz,n_shells=21,n_probes=64,radii=None,rtol =1.1,num_processes=4):
 
 
-
+    radii = []
+    for r in list(radii):
+        if r==0:
+            r=1e6
+        radii.append
     # Create argument tuples for each chunk
     args = [(i,atoms_xyz,n_probes,radius_shell,rtol) for i,radius_shell in enumerate(radii)]
 
@@ -44,6 +48,7 @@ def radial_shell_mp(atoms_xyz,n_shells=21,n_probes=64,radii=None,rtol =1.1,num_p
     probe_xyz = np.stack([result[0] for result in results])
     keep_mask = np.stack([result[1] for result in results])
     return probe_xyz,keep_mask
+
 def balance_bool_rows(a, target):
     """
     a: A 2D boolean array.
@@ -107,7 +112,7 @@ def Qscore2(volume,
     shell_index_blank = shell_index_blank
     #assert rads[shell_index_blank.min()]>1.4 # make sure distant from atom
     if n_blanks>0:
-      print("Closest blank:",rads[shell_index_blank.min()])
+        print("Closest blank:",rads[shell_index_blank.min()])
 
     #interpolate density 
     probe_xyz_flat = probe_xyz.reshape((n_atoms*n_shells*n_probes,3))
