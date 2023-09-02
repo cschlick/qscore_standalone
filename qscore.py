@@ -99,7 +99,7 @@ def radial_shell_worker(args):
     keep_sel = np.mean(keep_sel, axis=-1, keepdims=True)  
     keep_sel = np.squeeze(keep_sel, axis=-1)
 
-    return probe_xyz_r, keep_sel.astype(bool), all_pts
+    return probe_xyz_r, keep_sel.astype(bool)
 
 
 def radial_shell_mp(atoms_xyz,n_probes=64,n_probes_target=8,radii=None,rtol=0.9,num_processes=cpu_count()):
